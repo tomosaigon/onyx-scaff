@@ -52,6 +52,7 @@ const lensClient = new LensClient({
 const PROOF_OF_NAME = ['proofOfLensHandle'];
 
 const PEER_ADDRESS = "0xf25e4D9dA70b8463B52B5878A9464fC31574e06f";
+const ImpersonateOwnerAddress: string | false = "0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA";
 
 const HandleSelect: React.FC<{
   setter: (value: string) => void;
@@ -83,7 +84,7 @@ const AddDelegate: React.FC<{
   const { writeAsync, isLoading } = useScaffoldContractWrite({
     contractName: "EthereumDIDRegistry",
     functionName: "addDelegate",
-    args: [userAddress, ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`, issuerAddress, BigInt(3600*24*2)],
+    args: [userAddress, ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`, issuerAddress, BigInt(3600 * 24 * 2)],
     // value: parseEther("0.01"),
     onBlockConfirmation: txnReceipt => {
       console.log("📦 Transaction blockHash", txnReceipt.blockHash);
@@ -104,7 +105,7 @@ const AddDelegate: React.FC<{
               <span className="loading loading-spinner loading-sm"></span>
             ) : (
               <>
-                  addDelegate 
+                addDelegate
               </>
             )}
           </button>
@@ -157,7 +158,7 @@ const ExampleUI: NextPage = () => {
       localStorage.setItem('holderPrivKey', holderPrivKey);
       console.log(account.address);
     }
-    await xmtpMain(holderPrivKey);
+    await xmtpSetup(holderPrivKey);
 
     //create DID for Holder of Credential (did:key)
     // const holderDID = await didKey.create();
@@ -169,7 +170,8 @@ const ExampleUI: NextPage = () => {
 
     //Create a 'Proof of Name' VC
     const subjectData = {
-      "handle": selectedHandle // "tomot.lens"
+      "handle": selectedHandle, // "tomot.lens"
+      "owner": ImpersonateOwnerAddress || address,
     }
 
     //Additonal parameters can be added to VC including:
@@ -199,6 +201,8 @@ const ExampleUI: NextPage = () => {
     setJwtVP(await jwtService.signVP(holderDID, vp))
     console.log(jwtVP)
 
+    // await xmtpMain(holderPrivKey);
+
     console.log('----------------------VERIFY VC/VP------------------')
 
     //create DID resolvers
@@ -220,19 +224,34 @@ const ExampleUI: NextPage = () => {
 
   }
 
-  const xmtpMain = async (holderPrivKey: string) => {
+  const xmtpSetup = async (holderPrivKey: string) => {
     const wallet = new Wallet(holderPrivKey);
     const client = await Client.create(wallet, { env: "production" });
     await client.publishUserContact();
     clientRef.current = client;
-// debugger;
-    if (await client.canMessage(PEER_ADDRESS)) {
-      const conversation = await client.conversations.newConversation(PEER_ADDRESS);
+  };
+  const xmtpMain = async () => {
+    // debugger;
+    if (jwtVP === '') {
+      return;
+    }
+    if (clientRef.current === undefined) {
+      debugger;
+      return;
+    }
+    if (await clientRef.current.canMessage(PEER_ADDRESS) && !convRef.current) {
+      const conversation = await clientRef.current.conversations.newConversation(PEER_ADDRESS);
       convRef.current = conversation;
       //Loads the messages of the conversation
       const messages = await conversation.messages();
       setMessages(messages);
       conversation.send("gm");
+      conversation.send("auth: " + jwtVP);
+      if (!jwtVP) {
+        debugger;
+      } else {
+        setIsAuthed(true);
+      }
     } else {
       console.log("cant message because is not on the network.");
       //cant message because is not on the network.
@@ -240,15 +259,14 @@ const ExampleUI: NextPage = () => {
   }
 
 
+
   const clientRef = useRef<Client | undefined>(undefined);
   const convRef = useRef<Conversation | undefined>(undefined);
   const [messages, setMessages] = useState([] as DecodedMessage[]);
 
-  // issuer address
+  const [isAuthed, setIsAuthed] = useState(false);
   const [issuerAddress, setIssuerAddress] = useState("");
-  // holder address
   const [holderAddress, setHolderAddress] = useState("");
-  // lensHandles
   const [lensHandles, setLensHandles] = useState(['...']);
   const [selectedHandle, setSelectedHandle] = useState<string>(
     lensHandles.length > 0 ? lensHandles[0] : ''
@@ -264,6 +282,9 @@ const ExampleUI: NextPage = () => {
     // args: [address, "0x6c656e732b6f6e79780000000000000000000000000000000000000000000000", issuerAddress],
   });
   // console.log(ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`);
+  useEffect(() => {
+    xmtpMain();
+  }, [jwtVP]);
   useEffect(() => {
     const queryLens = async () => {
       const p = await lensClient.profile.fetch({ handle: "tomot.lens" })
@@ -291,9 +312,31 @@ const ExampleUI: NextPage = () => {
   }, [lensHandles]);
 
   useEffect(() => {
-    main();
-
+    if (selectedHandle !== '...') {
+      main();
+    }
   }, [selectedHandle]);
+
+  useEffect(() => {
+    if (convRef.current) {
+      const streamMessages = async () => {
+        const newStream = await convRef.current!.streamMessages();
+        for await (const msg of newStream) {
+          const exists = messages.find((m) => m.id === msg.id);
+          if (!exists) {
+            console.log("new message", msg);
+            setMessages((prevMessages) => {
+              const msgsnew = [...prevMessages, msg];
+              return msgsnew;
+            });
+          }
+        }
+        console.log("streaming messages done");
+      };
+      streamMessages();
+    }
+  }, [messages]);
+
   return (
     <>
       <MetaHeader
@@ -314,6 +357,25 @@ const ExampleUI: NextPage = () => {
         <p>Selected handle: {selectedHandle}</p>
 
         {address ? <AddDelegate userAddress={address} issuerAddress={issuerAddress} /> : ''}
+        <div>
+          <p>Messages:</p>
+          <ul>
+            {messages.filter(
+              (v, i, a) => a.findIndex((t) => t.id === v.id) === i
+            ).map((message: DecodedMessage) => (
+              <li key={message.id}>
+                {message.sent.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })}
+                {' '}
+                {message.senderAddress}: {message.content}
+              </li>
+            ))}
+          </ul>
+        </div>
         {/* <ContractInteraction /> */}
         {/* <ContractData /> */}
       </div>
