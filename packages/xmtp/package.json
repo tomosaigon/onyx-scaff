@@ -1,0 +1,7 @@
+{
+  "name": "xmtp",
+  "packageManager": "yarn@3.2.3",
+  "dependencies": {
+    "xmtp-bot-cli": "^0.0.5"
+  }
+}
