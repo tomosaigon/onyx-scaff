@@ -1,5 +1,6 @@
 
-import { ethers } from 'ethers'
+import { ethers, Wallet } from 'ethers'
+import { Client, Conversation, DecodedMessage } from "@xmtp/xmtp-js";
 import {
   EthrDIDMethod,
   KeyDIDMethod,
@@ -50,7 +51,7 @@ const lensClient = new LensClient({
 // const PROOF_OF_NAME = ['PROOF_OF_NAME'];
 const PROOF_OF_NAME = ['proofOfLensHandle'];
 
-
+const PEER_ADDRESS = "0xf25e4D9dA70b8463B52B5878A9464fC31574e06f";
 
 const HandleSelect: React.FC<{
   setter: (value: string) => void;
@@ -156,6 +157,8 @@ const ExampleUI: NextPage = () => {
       localStorage.setItem('holderPrivKey', holderPrivKey);
       console.log(account.address);
     }
+    await xmtpMain(holderPrivKey);
+
     //create DID for Holder of Credential (did:key)
     // const holderDID = await didKey.create();
     const holderDID = await didEthr.generateFromPrivateKey(holderPrivKey);
@@ -217,6 +220,30 @@ const ExampleUI: NextPage = () => {
 
   }
 
+  const xmtpMain = async (holderPrivKey: string) => {
+    const wallet = new Wallet(holderPrivKey);
+    const client = await Client.create(wallet, { env: "production" });
+    await client.publishUserContact();
+    clientRef.current = client;
+// debugger;
+    if (await client.canMessage(PEER_ADDRESS)) {
+      const conversation = await client.conversations.newConversation(PEER_ADDRESS);
+      convRef.current = conversation;
+      //Loads the messages of the conversation
+      const messages = await conversation.messages();
+      setMessages(messages);
+      conversation.send("gm");
+    } else {
+      console.log("cant message because is not on the network.");
+      //cant message because is not on the network.
+    }
+  }
+
+
+  const clientRef = useRef<Client | undefined>(undefined);
+  const convRef = useRef<Conversation | undefined>(undefined);
+  const [messages, setMessages] = useState([] as DecodedMessage[]);
+
   // issuer address
   const [issuerAddress, setIssuerAddress] = useState("");
   // holder address
@@ -245,6 +272,7 @@ const ExampleUI: NextPage = () => {
       }
       // const pp = await lensClient.profile.fetchAll({ ownedBy: ["0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"] })
       // ({ handle: "tomot.lens" })
+      console.log('Pretending to be lens owner...');
       const lensAddress = "0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"; // address
       setLensHandles((await lensClient.profile.fetchAll({ ownedBy: [lensAddress] })).items.map(i => i.handle));
 
@@ -285,7 +313,7 @@ const ExampleUI: NextPage = () => {
         <HandleSelect setter={setSelectedHandle} handles={lensHandles} />
         <p>Selected handle: {selectedHandle}</p>
 
-        <AddDelegate userAddress={address} issuerAddress={issuerAddress} />
+        {address ? <AddDelegate userAddress={address} issuerAddress={issuerAddress} /> : ''}
         {/* <ContractInteraction /> */}
         {/* <ContractData /> */}
       </div>
