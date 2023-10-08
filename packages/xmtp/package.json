@@ -2,6 +2,10 @@
   "name": "xmtp",
   "packageManager": "yarn@3.2.3",
   "dependencies": {
+    "@jpmorganchase/onyx-ssi-sdk": "^0.0.1",
+    "@lens-protocol/client": "^1.3.1",
+    "ethers": "^6.7.1",
+    "ethr-did-resolver": "^9.0.0",
     "xmtp-bot-cli": "^0.0.5"
   }
 }
