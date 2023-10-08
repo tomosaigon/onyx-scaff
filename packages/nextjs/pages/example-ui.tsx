@@ -60,6 +60,7 @@ const HandleSelect: React.FC<{
 }> = ({ setter, handles }) => {
   const handleSelectChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const selectedValue = event.target.value;
+    if (selectedValue === '') { return; }
     setter(selectedValue);
   };
 
@@ -67,6 +68,7 @@ const HandleSelect: React.FC<{
     <div>
       <label htmlFor="handleSelect">Select a handle:</label>
       <select id="handleSelect" onChange={handleSelectChange}>
+        <option key={'foo'} value={''}>[choose handle]</option>
         {handles.map((handle) => (
           <option key={handle} value={handle}>
             {handle}
@@ -245,7 +247,7 @@ const ExampleUI: NextPage = () => {
       //Loads the messages of the conversation
       const messages = await conversation.messages();
       setMessages(messages);
-      conversation.send("gm");
+      // conversation.send("gm");
       conversation.send("auth: " + jwtVP);
       if (!jwtVP) {
         debugger;
@@ -269,7 +271,7 @@ const ExampleUI: NextPage = () => {
   const [holderAddress, setHolderAddress] = useState("");
   const [lensHandles, setLensHandles] = useState(['...']);
   const [selectedHandle, setSelectedHandle] = useState<string>(
-    lensHandles.length > 0 ? lensHandles[0] : ''
+    lensHandles.length > 0 && lensHandles[0] != '...' ? lensHandles[0] : ''
   );
   // jwtVP
   const [jwtVP, setJwtVP] = useState<string>('');
@@ -305,14 +307,14 @@ const ExampleUI: NextPage = () => {
     queryLens();
   }, [address]);
 
-  useEffect(() => {
-    if (lensHandles.length > 0) {
-      setSelectedHandle(lensHandles[0]);
-    }
-  }, [lensHandles]);
+  // useEffect(() => {
+  //   if (lensHandles.length > 0) {
+  //     setSelectedHandle(lensHandles[0]);
+  //   }
+  // }, [lensHandles]);
 
   useEffect(() => {
-    if (selectedHandle !== '...') {
+    if (selectedHandle && selectedHandle !== '...') {
       main();
     }
   }, [selectedHandle]);
@@ -343,7 +345,7 @@ const ExampleUI: NextPage = () => {
   return (
     <>
       <MetaHeader
-        title="Example UI | Scaffold-ETH 2"
+        title="LensPostbox"
         description="Example UI created with 🏗 Scaffold-ETH 2, showcasing some of its features."
       >
         {/* We are importing the font this way to lighten the size of SE2. */}
@@ -366,27 +368,34 @@ const ExampleUI: NextPage = () => {
             {messages.filter(
               (v) => v.senderAddress === PEER_ADDRESS
             ).filter(
+              (v, i, a) => i > a.length - 10
+            ).filter(
               (v, i, a) => a.findIndex((t) => t.id === v.id) === i
             ).map((message: DecodedMessage) => (
-              <li key={message.id}>
-                {message.sent.toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false,
-                })}
-                {' '}
-                {message.senderAddress}: {message.content}
-                {(message.content as string).split('\n')[0].startsWith('from: 0x') ?
-                  (<>
-                    <span>&nbsp;[<a href='#' onClick={(evt) => { nope(evt, message) }} >nope</a>]</span>
-                    <span>&nbsp;[<a href='#' onClick={(evt) => { ack(evt, message) }} >ack</a>]</span>
-                  </>) : ''}
+              <li key={message.id} className='p-2 m-2 border-solid border-black'>
+                <div className='xxxw-16'>
+                  {message.sent.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                  })}
+                </div>
+                <div className='xxxw-32'>
+                  <code>
+                    {message.content}
+                  </code>
+                  {(message.content as string).split('\n')[0].startsWith('from: 0x') ?
+                    (<>
+                      <span>&nbsp;[<a href='#' onClick={(evt) => { nope(evt, message) }} >nope</a>]</span>
+                      <span>&nbsp;[<a href='#' onClick={(evt) => { ack(evt, message) }} >ack</a>]</span>
+                    </>) : ''}
+                </div>
               </li>
             ))}
           </ul>
         </div>
-        <div>
+        <div style={{ opacity: 0.1 }}>
           <p>Outbox Messages:</p>
           <ul>
             {messages.filter(
