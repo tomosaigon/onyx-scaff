@@ -126,7 +126,7 @@ const ExampleUI: NextPage = () => {
 
     //Create a 'Proof of Name' VC
     const subjectData = {
-      "handle": "tomot.lens"
+      "handle": selectedHandle // "tomot.lens"
     }
 
     //Additonal parameters can be added to VC including:
@@ -152,7 +152,8 @@ const ExampleUI: NextPage = () => {
     const vp = await createPresentation(holderDID.did, [jwtVC])
     console.log(JSON.stringify(vp, null, 2))
 
-    const jwtVP = await jwtService.signVP(holderDID, vp)
+    // const jwtVP = await jwtService.signVP(holderDID, vp)
+    setJwtVP(await jwtService.signVP(holderDID, vp))
     console.log(jwtVP)
 
     console.log('----------------------VERIFY VC/VP------------------')
@@ -174,32 +175,6 @@ const ExampleUI: NextPage = () => {
     const resultVp = await verifyPresentationJWT(jwtVP, didResolver)
     console.log(resultVp)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    const p = await lensClient.profile.fetch({ handle: "tomot.lens" })
-    if (p) {
-      console.log(p.ownedBy);
-    }
-    // const pp = await lensClient.profile.fetchAll({ ownedBy: ["0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"] })
-    // ({ handle: "tomot.lens" })
-    const lensAddress = "0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"; // address
-    setLensHandles((await lensClient.profile.fetchAll({ ownedBy: [lensAddress] })).items.map(i => i.handle));
-
-    // const p = await lensClient.explore.profiles({
-    //   sortCriteria: ProfileSortCriteria.MostFollowers
-    // })
-    // debugger;
   }
 
   // issuer address
@@ -211,6 +186,8 @@ const ExampleUI: NextPage = () => {
   const [selectedHandle, setSelectedHandle] = useState<string>(
     lensHandles.length > 0 ? lensHandles[0] : ''
   );
+  // jwtVP
+  const [jwtVP, setJwtVP] = useState<string>('');
   const { address } = useAccount();
   const { data: isValid } = useScaffoldContractRead({
     contractName: "EthereumDIDRegistry",
@@ -220,6 +197,25 @@ const ExampleUI: NextPage = () => {
     // args: [address, "0x6c656e732b6f6e79780000000000000000000000000000000000000000000000", issuerAddress],
   });
   useEffect(() => {
+    const queryLens = async () => {
+      const p = await lensClient.profile.fetch({ handle: "tomot.lens" })
+      if (p) {
+        console.log(p.ownedBy);
+      }
+      // const pp = await lensClient.profile.fetchAll({ ownedBy: ["0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"] })
+      // ({ handle: "tomot.lens" })
+      const lensAddress = "0xA1656A78637d6f5E1C17926a8CEA28b66D2f85dA"; // address
+      setLensHandles((await lensClient.profile.fetchAll({ ownedBy: [lensAddress] })).items.map(i => i.handle));
+
+      // const p = await lensClient.explore.profiles({
+      //   sortCriteria: ProfileSortCriteria.MostFollowers
+      // })
+      // debugger;
+    };
+    queryLens();
+  }, [address]);
+
+  useEffect(() => {
     if (lensHandles.length > 0) {
       setSelectedHandle(lensHandles[0]);
     }
@@ -227,8 +223,8 @@ const ExampleUI: NextPage = () => {
 
   useEffect(() => {
     main();
-    
-  }, []);
+
+  }, [selectedHandle]);
   return (
     <>
       <MetaHeader
@@ -244,6 +240,7 @@ const ExampleUI: NextPage = () => {
         <span>Holder: {holderAddress}</span>
         <span>Address: {address}</span>
         <span>isValid: {isValid ? "true" : "false"}</span>
+        <span>jwtVP: {jwtVP}</span>
         <HandleSelect setter={setSelectedHandle} handles={lensHandles} />
         <p>Selected handle: {selectedHandle}</p>
         {/* <ContractInteraction /> */}
