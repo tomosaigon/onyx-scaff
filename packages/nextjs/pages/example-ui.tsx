@@ -27,6 +27,7 @@ import {
   useScaffoldContractRead,
   useScaffoldEventHistory,
   useScaffoldEventSubscriber,
+  useScaffoldContractWrite
 } from "~~/hooks/scaffold-eth";
 import type { NextPage } from "next";
 import { MetaHeader } from "~~/components/MetaHeader";
@@ -73,6 +74,45 @@ const HandleSelect: React.FC<{
     </div>
   );
 };
+
+const AddDelegate: React.FC<{
+  userAddress: string;
+  issuerAddress: string;
+}> = ({ userAddress, issuerAddress }) => {
+  const { writeAsync, isLoading } = useScaffoldContractWrite({
+    contractName: "EthereumDIDRegistry",
+    functionName: "addDelegate",
+    args: [userAddress, ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`, issuerAddress, BigInt(3600*24*2)],
+    // value: parseEther("0.01"),
+    onBlockConfirmation: txnReceipt => {
+      console.log("📦 Transaction blockHash", txnReceipt.blockHash);
+    },
+  });
+  return (
+    <div>
+      <p>User Address: {userAddress}</p>
+      <p>Issuer Address: {issuerAddress}</p>
+      <div className="flex rounded-full border border-primary p-1 flex-shrink-0">
+        <div className="flex rounded-full border-2 border-primary p-1">
+          <button
+            className="btn btn-primary rounded-full capitalize font-normal font-white w-24 flex items-center gap-1 hover:gap-2 transition-all tracking-widest"
+            onClick={() => writeAsync()}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : (
+              <>
+                  addDelegate 
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const ExampleUI: NextPage = () => {
   async function main() {
@@ -152,7 +192,7 @@ const ExampleUI: NextPage = () => {
     const vp = await createPresentation(holderDID.did, [jwtVC])
     console.log(JSON.stringify(vp, null, 2))
 
-    // const jwtVP = await jwtService.signVP(holderDID, vp)
+    const _jwtVP = await jwtService.signVP(holderDID, vp)
     setJwtVP(await jwtService.signVP(holderDID, vp))
     console.log(jwtVP)
 
@@ -172,7 +212,7 @@ const ExampleUI: NextPage = () => {
     console.log(resultVc)
 
     //Verify VP JWT from Holder
-    const resultVp = await verifyPresentationJWT(jwtVP, didResolver)
+    const resultVp = await verifyPresentationJWT(_jwtVP, didResolver)
     console.log(resultVp)
 
   }
@@ -193,9 +233,10 @@ const ExampleUI: NextPage = () => {
     contractName: "EthereumDIDRegistry",
     functionName: "validDelegate",
     // lens+onyx 
-    args: [address, `0x${ethers.utils.hexlify(ethers.utils.toUtf8Bytes("lens+onyx"))}`, issuerAddress],
+    args: [address, ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`, issuerAddress],
     // args: [address, "0x6c656e732b6f6e79780000000000000000000000000000000000000000000000", issuerAddress],
   });
+  // console.log(ethers.utils.formatBytes32String("lens+onyx") as `0x${string}`);
   useEffect(() => {
     const queryLens = async () => {
       const p = await lensClient.profile.fetch({ handle: "tomot.lens" })
@@ -243,6 +284,8 @@ const ExampleUI: NextPage = () => {
         <span>jwtVP: {jwtVP}</span>
         <HandleSelect setter={setSelectedHandle} handles={lensHandles} />
         <p>Selected handle: {selectedHandle}</p>
+
+        <AddDelegate userAddress={address} issuerAddress={issuerAddress} />
         {/* <ContractInteraction /> */}
         {/* <ContractData /> */}
       </div>
