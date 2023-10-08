@@ -82,7 +82,7 @@ async function checkVP(vpJWT: string) {
     console.log(handle);
     console.log(vc.payload.vc.credentialSubject);
     const subject: string = (() => { const match = vc.payload.sub.match(/did:ethr:hardhat:(0x[0-9a-fA-F]{40})/); return match ? match[1] : ''; })();
-    const issuer : string = (() => { const match = vc.payload.iss.match(/did:ethr:hardhat:(0x[0-9a-fA-F]{40})/); return match ? match[1] : ''; })();
+    const issuer: string = (() => { const match = vc.payload.iss.match(/did:ethr:hardhat:(0x[0-9a-fA-F]{40})/); return match ? match[1] : ''; })();
     // await lensClient.profile.fetchAll({ ownedBy: [lensAddress] })).items.map(i => i.handle))
     const profile = await lensClient.profile.fetch({ handle: handle });
     let owner = profile!.ownedBy;
@@ -108,6 +108,7 @@ interface ILensCred {
     handle: string;
 }
 const handles = new Map<string, ILensCred>();
+const senders = new Map<string, ILensCred>();
 const convos = new Map<string, Conversation>();
 
 console.log('Starting bot. Enter your custom greeting, e.g. gm (or "exit" to exit, "info" to see current greeting):');
@@ -157,6 +158,7 @@ const bot = new XmtpBot(
             } else {
                 message.conversation.send('auth ok for ' + res.handle + ' from ' + message.senderAddress);
                 handles.set(res.handle, res);
+                senders.set(message.senderAddress, res);
                 convos.set(message.senderAddress, message.conversation);
             }
             return true;
@@ -166,9 +168,23 @@ const bot = new XmtpBot(
             if (res === undefined) {
                 message.conversation.send('lens not found');
             } else {
-                message.conversation.send(`lens found, handle = ${handle}, subject = ${res.subject}, issuer = ${res.issuer}`);
+                console.log(`lens found, handle = ${handle}, subject = ${res.subject}, issuer = ${res.issuer}`);
                 await convos.get(res.subject)?.send('from: ' + message.senderAddress + '\n' + message.content);
+                if (convos.get(message.senderAddress) === undefined) {
+                    convos.set(message.senderAddress, message.conversation);
+                }
+                return true;
             }
+        } else if ((message.content as string).startsWith('reply: 0x')) {
+            const recipient = (message.content as string).split('\n')[0].substring('reply: '.length);
+            const handle = senders.get(message.senderAddress)?.handle;
+            console.debug('from: @' + handle + '\n' + message.content.split('\n').slice(1).join('\n'));
+            if (convos.get(recipient) === undefined) {
+                message.conversation.send('lens not found');
+                console.log(convos.keys());
+                return true;
+            }
+            convos.get(recipient)?.send('from: @' + handle + '\n' + message.content.split('\n').slice(1).join('\n'));
             return true;
         }
         message.conversation.send(ctx.greeting ? ctx.greeting : 'gm');

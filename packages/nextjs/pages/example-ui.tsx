@@ -337,6 +337,9 @@ const ExampleUI: NextPage = () => {
     }
   }, [messages]);
 
+  const ack = (evt: React.MouseEvent<HTMLAnchorElement>, message: DecodedMessage) => { const to = (message.content as string).split('\n')[0].substring('from: '.length); message.conversation.send('reply: ' + to + '\nack'); evt.preventDefault() }
+  const nope = (evt: React.MouseEvent<HTMLAnchorElement>, message: DecodedMessage) => { const to = (message.content as string).split('\n')[0].substring('from: '.length); message.conversation.send('reply: ' + to + '\nnope'); evt.preventDefault() }
+
   return (
     <>
       <MetaHeader
@@ -358,9 +361,37 @@ const ExampleUI: NextPage = () => {
 
         {address ? <AddDelegate userAddress={address} issuerAddress={issuerAddress} /> : ''}
         <div>
-          <p>Messages:</p>
+          <p>Inbox Messages:</p>
           <ul>
             {messages.filter(
+              (v) => v.senderAddress === PEER_ADDRESS
+            ).filter(
+              (v, i, a) => a.findIndex((t) => t.id === v.id) === i
+            ).map((message: DecodedMessage) => (
+              <li key={message.id}>
+                {message.sent.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })}
+                {' '}
+                {message.senderAddress}: {message.content}
+                {(message.content as string).split('\n')[0].startsWith('from: 0x') ?
+                  (<>
+                    <span>&nbsp;[<a href='#' onClick={(evt) => { nope(evt, message) }} >nope</a>]</span>
+                    <span>&nbsp;[<a href='#' onClick={(evt) => { ack(evt, message) }} >ack</a>]</span>
+                  </>) : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p>Outbox Messages:</p>
+          <ul>
+            {messages.filter(
+              (v) => v.senderAddress === holderAddress
+            ).filter(
               (v, i, a) => a.findIndex((t) => t.id === v.id) === i
             ).map((message: DecodedMessage) => (
               <li key={message.id}>
